@@ -16,3 +16,4 @@
 # Misc
 *.tmp
 *.sha256sums
+/.idea

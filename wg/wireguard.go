@@ -23,12 +23,13 @@ type State struct {
 	Port        int
 	PrivKey     wgtypes.Key
 	PubKey      wgtypes.Key
+	MTU         int
 }
 
 // New creates a new Wesher Wireguard state.
 // The Wireguard keys are generated for every new interface.
 // The interface must later be setup using SetUpInterface.
-func New(iface string, port int, prefix netip.Prefix, name string) (*State, *common.Node, error) {
+func New(iface string, port int, mtu int, prefix netip.Prefix, name string) (*State, *common.Node, error) {
 	client, err := wgctrl.New()
 	if err != nil {
 		return nil, nil, fmt.Errorf("instantiating wireguard client: %w", err)
@@ -46,6 +47,7 @@ func New(iface string, port int, prefix netip.Prefix, name string) (*State, *com
 		Port:    port,
 		PrivKey: privKey,
 		PubKey:  pubKey,
+		MTU:     mtu,
 	}
 	if err := state.assignOverlayAddr(prefix, name); err != nil {
 		return nil, nil, fmt.Errorf("assigning overlay address: %w", err)
@@ -129,8 +131,7 @@ func (s *State) SetUpInterface(nodes []common.Node) error {
 	}); err != nil {
 		return fmt.Errorf("setting address for %s: %w", s.iface, err)
 	}
-	// TODO: make MTU configurable?
-	if err := netlink.LinkSetMTU(link, 1420); err != nil {
+	if err := netlink.LinkSetMTU(link, s.MTU); err != nil {
 		return fmt.Errorf("setting MTU for %s: %w", s.iface, err)
 	}
 	if err := netlink.LinkSetUp(link); err != nil {
