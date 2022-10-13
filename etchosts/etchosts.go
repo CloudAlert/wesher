@@ -13,7 +13,7 @@ import (
 )
 
 // DefaultBanner is the default magic comment used to identify entries managed by etchosts
-const DefaultBanner = "# ! MANAGED AUTOMATICALLY !"
+const DefaultBanner = "# ! MANAGED AUTOMATICALLY BY WESHER !"
 
 // DefaultPath is the default path used to write hosts entries
 const DefaultPath = "/etc/hosts"

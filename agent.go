@@ -33,6 +33,7 @@ type AgentCmd struct {
 	Interface        string       `env:"WESHER_INTERFACE" help:"name of the wireguard interface to create and manage" default:"wgoverlay"`
 	NoEtcHosts       bool         `env:"WESHER_NO_ETC_HOSTS" help:"disable writing of entries to /etc/hosts"`
 	NodeUpdateScript string       `env:"WESHER_NODE_UPDATE_SCRIPT" help:"path to script which is executed everytime the service receives an update for a node"`
+	WireguardAddress string       `env:"WESHER_WIREGUARD_ADDRESS" help:"fixed address for the wireguard interface"`
 
 	// for easier local testing; will break etchosts entry
 	UseIPAsName bool `name:"ip-as-name" default:"false" hidden:""`
@@ -51,7 +52,7 @@ func (a *AgentCmd) Validate() error {
 		return fmt.Errorf("setting both bind address and bind interface is not supported")
 	} else if a.BindIface != "" {
 		// Compute the actual bind address based on the provided interface
-		iface, err := net.InterfaceByName(a.BindIface)
+		var iface, err = net.InterfaceByName(a.BindIface)
 		if err != nil {
 			return fmt.Errorf("getting interface by name %s: %w", a.BindIface, err)
 		}
@@ -87,7 +88,7 @@ func (a *AgentCmd) Run() error {
 	if err != nil {
 		logrus.WithError(err).Fatal("could not create cluster")
 	}
-	wgstate, localNode, err := wg.New(a.Interface, a.WireguardPort, a.MTU, a.OverlayNet, cluster.LocalName)
+	wgstate, localNode, err := wg.New(a.Interface, a.WireguardPort, a.MTU, a.OverlayNet, cluster.LocalName, a.WireguardAddress)
 	if err != nil {
 		logrus.WithError(err).Fatal("could not instantiate wireguard controller")
 	}

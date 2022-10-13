@@ -29,7 +29,7 @@ type State struct {
 // New creates a new Wesher Wireguard state.
 // The Wireguard keys are generated for every new interface.
 // The interface must later be setup using SetUpInterface.
-func New(iface string, port int, mtu int, prefix netip.Prefix, name string) (*State, *common.Node, error) {
+func New(iface string, port int, mtu int, prefix netip.Prefix, name string, wgAddress string) (*State, *common.Node, error) {
 	client, err := wgctrl.New()
 	if err != nil {
 		return nil, nil, fmt.Errorf("instantiating wireguard client: %w", err)
@@ -49,8 +49,8 @@ func New(iface string, port int, mtu int, prefix netip.Prefix, name string) (*St
 		PubKey:  pubKey,
 		MTU:     mtu,
 	}
-	if err := state.assignOverlayAddr(prefix, name); err != nil {
-		return nil, nil, fmt.Errorf("assigning overlay address: %w", err)
+	if err := state.assignOverlayAddr(prefix, name, wgAddress); err != nil {
+		return nil, nil, fmt.Errorf("xassigning overlay address: %w", err)
 	}
 
 	node := &common.Node{}
@@ -65,25 +65,44 @@ func New(iface string, port int, mtu int, prefix netip.Prefix, name string) (*St
 // provided name deterministically.
 // Currently, the address is assigned by hashing the name and mapping that
 // hash in the target network space.
-func (s *State) assignOverlayAddr(prefix netip.Prefix, name string) error {
-	ip := prefix.Addr().AsSlice()
+func (s *State) assignOverlayAddr(prefix netip.Prefix, name string, wgAddress string) error {
+	var overlayAddr netip.Addr
 
-	h := fnv.New128a()
-	h.Write([]byte(name))
-	hb := h.Sum(nil)
+	logrus.Debugf("wireguard address: %s", wgAddress)
 
-	for i := 1; i <= (prefix.Addr().BitLen()-prefix.Bits())/8; i++ {
-		ip[len(ip)-i] = hb[len(hb)-i]
+	if wgAddress != "" && wgAddress != "0.0.0.0" {
+		addr, err := netip.ParseAddr(wgAddress)
+		if err != nil {
+			return fmt.Errorf("could not set wireguard IP %q", wgAddress)
+		} else {
+			if prefix.Contains(addr) {
+				overlayAddr = addr
+			} else {
+				fmt.Errorf("wireguard IP %q not part of the overlay network %s", wgAddress, prefix.String())
+			}
+		}
+	} else {
+		ip := prefix.Addr().AsSlice()
+
+		h := fnv.New128a()
+		h.Write([]byte(name))
+		hb := h.Sum(nil)
+
+		for i := 1; i <= (prefix.Addr().BitLen()-prefix.Bits())/8; i++ {
+			ip[len(ip)-i] = hb[len(hb)-i]
+		}
+
+		addr, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			return fmt.Errorf("could not create IP from %s", ip)
+		}
+
+		overlayAddr = addr
 	}
 
-	addr, ok := netip.AddrFromSlice(ip)
-	if !ok {
-		return fmt.Errorf("could not create IP from %q", ip)
-	}
+	logrus.Debugf("assigned overlay address: %s", overlayAddr)
 
-	logrus.Debugf("assigned overlay address: %s", addr)
-
-	s.OverlayAddr = addr
+	s.OverlayAddr = overlayAddr
 
 	return nil
 }
