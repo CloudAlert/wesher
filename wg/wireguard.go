@@ -190,10 +190,23 @@ func (s *State) nodesToPeerConfigs(nodes []common.Node) ([]wgtypes.PeerConfig, e
 				IP:   node.Addr,
 				Port: s.Port,
 			},
-			AllowedIPs: []net.IPNet{
-				*addrToIPNet(node.OverlayAddr),
-			},
+			AllowedIPs: getPrivateNamespaceRoutes(*addrToIPNet(node.OverlayAddr)),
 		}
 	}
 	return peerCfgs, nil
+}
+
+func getPrivateNamespaceRoutes(overlayAddr net.IPNet) []net.IPNet {
+	privateNetList := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
+	routes := make([]net.IPNet, len(privateNetList)+1)
+	routes[0] = overlayAddr
+	for i := 0; i < len(privateNetList); i += 1 {
+		_, ipnet, err := net.ParseCIDR(privateNetList[i])
+		if err != nil {
+			continue
+		}
+		routes[i+1] = *ipnet
+	}
+
+	return routes
 }
